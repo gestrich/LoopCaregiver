@@ -42,7 +42,7 @@ final class OverrideViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.pickerSelectedOverride, activeOverride)
     }
     
-    func testLoading_OverridesInactive_SelectsNoOverride() async throws {
+    func testLoading_OverridesInactive_SelectsFirstOverride() async throws {
         
         //Arrange
 
@@ -60,7 +60,7 @@ final class OverrideViewModelTests: XCTestCase {
         
         //Assert
         
-        XCTAssertNil(viewModel.pickerSelectedOverride)
+        XCTAssertEqual(viewModel.pickerSelectedOverride, availableOverrides[0])
     }
     
     func testLoading_WhenSuccessful_HasCompleteState() async throws {
@@ -87,7 +87,6 @@ final class OverrideViewModelTests: XCTestCase {
         default:
             XCTFail("Wrong case")
         }
-        XCTAssertTrue(viewModel.pickerSelectedOverride == viewModel.activeOverride)
     }
     
     func testLoading_WhenErrorOccurs_HasErrorState() async throws {
