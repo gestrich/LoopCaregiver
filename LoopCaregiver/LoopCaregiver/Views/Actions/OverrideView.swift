@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import NightscoutKit
+//import NightscoutKit
 import Combine
 
 struct OverrideView: View {
@@ -53,10 +53,10 @@ struct OverrideView: View {
                     Section (){
                         if viewModel.pickerSelectedOverride != nil {
                             HStack {
-                                //Loading Pickers when there is a nil selection causes consolve warnings
+                                //Loading Pickers when there is a nil selection causes console warnings
                                 Picker("Overrides", selection: $viewModel.pickerSelectedOverride) {
                                     ForEach(overrideState.availableOverrides, id: \.self) { overrideValue in
-                                        Text(overrideValue.presentableDescription()).tag(overrideValue as TemporaryScheduleOverride?)
+                                        Text(overrideValue.presentableDescription()).tag(overrideValue as CGTemporaryScheduleOverride?)
                                             .fontWeight(overrideValue == viewModel.activeOverride ? .heavy : .regular)
                                     }
                                 }.pickerStyle(.wheel)
@@ -219,7 +219,7 @@ struct OverrideView: View {
         }
     }
     
-    func experimentalPresetButtonRow(preset: TemporaryScheduleOverride) -> some View {
+    func experimentalPresetButtonRow(preset: CGTemporaryScheduleOverride) -> some View {
         Button(action: {
             viewModel.pickerSelectedOverride = preset
             viewModel.experimentalEditPresetShowing = true
@@ -240,8 +240,8 @@ class OverrideViewModel: ObservableObject, Identifiable {
     var cancellables = [AnyCancellable]()
     
     @Published var overrideListState: OverrideListState = .loading
-    @Published var pickerSelectedOverride: TemporaryScheduleOverride?
-    @Published var activeOverride: TemporaryScheduleOverride?
+    @Published var pickerSelectedOverride: CGTemporaryScheduleOverride?
+    @Published var activeOverride: CGTemporaryScheduleOverride?
     @Published var lastDeliveryError: Error? = nil
     @Published var deliveryInProgress: Bool = false
     @Published var enableIndefinitely: Bool = false
@@ -392,6 +392,11 @@ class OverrideViewModel: ObservableObject, Identifiable {
             }
             overrideListState = .loadingComplete(overrideState: overrideState)
             if let activeOverride = overrideState.activeOverride {
+                //TODO: This ensures the active gets used
+                //but if the user scrolls, this will go away
+                //You can replace that item in the array with the
+                //active, but then you lose the "default" properties
+                //of the available one.
                 self.pickerSelectedOverride = activeOverride
                 self.activeOverride = activeOverride
             } else if let firstOverride = overrideState.availableOverrides.first {
@@ -476,8 +481,8 @@ protocol OverrideViewDelegate {
 }
 
 struct OverrideState: Equatable {
-    let activeOverride: TemporaryScheduleOverride?
-    let availableOverrides: [TemporaryScheduleOverride]
+    let activeOverride: CGTemporaryScheduleOverride?
+    let availableOverrides: [CGTemporaryScheduleOverride]
 }
 
 
@@ -491,9 +496,9 @@ struct OverrideView_Previews: PreviewProvider {
 
 struct OverrideViewPreviewMock: OverrideViewDelegate {
     
-    var currentOverride: TemporaryScheduleOverride?
+    var currentOverride: CGTemporaryScheduleOverride?
     
-    var presets: [NightscoutKit.TemporaryScheduleOverride]
+    var presets: [CGTemporaryScheduleOverride]
     
     func overrideState() async throws -> OverrideState {
         //throw OverrideViewPreviewMockError.NetworkError //For testing
@@ -510,10 +515,10 @@ struct OverrideViewPreviewMock: OverrideViewDelegate {
         
     }
     
-    static var mockOverrides: [NightscoutKit.TemporaryScheduleOverride] {
+    static var mockOverrides: [CGTemporaryScheduleOverride] {
         return [
-            TemporaryScheduleOverride(duration: 60.0 * 60.0, targetRange: ClosedRange(uncheckedBounds: (110, 130)), insulinNeedsScaleFactor: 0.3, symbol: "🏃", name: "Running"),
-            TemporaryScheduleOverride(duration: 60.0 * 90.0, targetRange: ClosedRange(uncheckedBounds: (110, 130)), insulinNeedsScaleFactor: 1.3, symbol: "🏊", name: "Swimming")
+            CGTemporaryScheduleOverride(duration: 60.0 * 60.0, targetRange: ClosedRange(uncheckedBounds: (110, 130)), insulinNeedsScaleFactor: 0.3, symbol: "🏃", name: "Running"),
+            CGTemporaryScheduleOverride(duration: 60.0 * 90.0, targetRange: ClosedRange(uncheckedBounds: (110, 130)), insulinNeedsScaleFactor: 1.3, symbol: "🏊", name: "Swimming")
         ]
     }
     
@@ -532,11 +537,28 @@ struct OverrideViewPreviewMock: OverrideViewDelegate {
 
 extension RemoteDataServiceManager: OverrideViewDelegate {
     func overrideState() async throws -> OverrideState {
-        return OverrideState(activeOverride: activeOverride(), availableOverrides: currentProfile?.settings.overridePresets ?? [])
+        let nsOverrides = currentProfile?.settings.overridePresets ?? []
+        let cgOverrides  = nsOverrides.map({CGTemporaryScheduleOverride(duration: $0.duration, targetRange: $0.targetRange, insulinNeedsScaleFactor: $0.insulinNeedsScaleFactor, symbol: $0.symbol, name: $0.name)})
+
+        var cgActiveOverride: CGTemporaryScheduleOverride? = nil
+        if let nsActiveOverride = activeOverride() {
+            cgActiveOverride = TemporaryScheduleOverride(duration: nsActiveOverride.duration, targetRange: nsActiveOverride.targetRange, insulinNeedsScaleFactor: nsActiveOverride.insulinNeedsScaleFactor, symbol: nsActiveOverride.symbol, name: nsActiveOverride.name)
+        }
+
+//        var availableOverrides = currentProfile?.settings.overridePresets ?? []
+//        let activeOverride = activeOverride()
+//        if let activeOverride = activeOverride {
+//            if let index = availableOverrides.firstIndex(where: {$0.id == activeOverride.id}) {
+//                availableOverrides[index] = activeOverride
+//            }
+//        }
+//
+//        return OverrideState(activeOverride: activeOverride, availableOverrides: availableOverrides)
+        return OverrideState(activeOverride: cgActiveOverride, availableOverrides: cgOverrides)
     }
 }
 
-extension TemporaryScheduleOverride: Identifiable {
+extension CGTemporaryScheduleOverride: Identifiable {
     public var id: String {
         return name ?? ""
     }
@@ -590,5 +612,22 @@ struct CustomDatePicker: View {
                 }
                 .pickerStyle(.wheel)
             }
+    }
+}
+
+public struct CGTemporaryScheduleOverride {
+    
+    public let targetRange: ClosedRange<Double>?
+    public let insulinNeedsScaleFactor: Double?
+    public let symbol: String?
+    public let duration: TimeInterval
+    public let name: String?
+    
+    public init(duration: TimeInterval, targetRange: ClosedRange<Double>?, insulinNeedsScaleFactor: Double?, symbol: String?, name: String?) {
+        self.targetRange = targetRange
+        self.insulinNeedsScaleFactor = insulinNeedsScaleFactor
+        self.symbol = symbol
+        self.duration = duration
+        self.name = name
     }
 }
